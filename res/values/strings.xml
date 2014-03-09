@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">SDN Controller</string>
+    <string name="action_settings">Settings</string>
+    <string name="sdn_control_switch_message">SDN Controlling</string>
+    <string name="introduction">This App is designed for EIT SDN test</string>
+
+</resources>
