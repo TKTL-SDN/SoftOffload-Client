@@ -179,9 +179,9 @@ public class UDPListeningService extends IntentService {
             } else {
                 // find corresponding config
                 List<WifiConfiguration> list = wifiManager.getConfiguredNetworks();
-                for( WifiConfiguration i : list ) {
+                for(WifiConfiguration i : list) {
                     // Log.d("test", i.SSID);
-                    if(i.SSID != null && i.SSID.equals(fields[1])) {
+                    if(i.SSID != null && i.SSID.equals("\"" + fields[1] + "\"")) {
                         Log.d("UDPListeningService", "find existing config for ssid: " + fields[1]);
                         connectWifiNetwork(wifiManager, i);
                         return;
@@ -209,7 +209,7 @@ public class UDPListeningService extends IntentService {
                 wifiManager.addNetwork(conf);
                 Log.d("test", "created new config successfully");
                 list = wifiManager.getConfiguredNetworks();
-                for( WifiConfiguration i : list ) {
+                for(WifiConfiguration i : list) {
                     // Log.d("test", i.SSID);
                     if(i.SSID != null && i.SSID.equals("\"" + fields[1] + "\"")) {
                         connectWifiNetwork(wifiManager, i);
@@ -234,7 +234,11 @@ public class UDPListeningService extends IntentService {
             NetworkInfo networkInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
             if (networkInfo != null && networkInfo.isConnected()) {
                 WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-                if (wifiInfo.getSSID().equals(config.SSID)) {
+
+                // Log.d(logTag, wifiInfo.getSSID());
+                // Log.d(logTag, config.SSID);
+
+                if (("\"" + wifiInfo.getSSID() + "\"").equals(config.SSID)) {
                     Log.i(logTag, "connected to new network: " + config.SSID);
                     return;
                 }

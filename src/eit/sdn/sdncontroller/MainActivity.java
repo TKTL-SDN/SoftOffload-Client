@@ -70,7 +70,7 @@ public class MainActivity extends Activity {
         boolean on = ((Switch) view).isChecked();
 
         if (on) {
-            Log.d("Main", "switch is checked on");
+            Log.d("Main", "SDN switch is checked on");
 
             // Is mobile connected to some network?
             if (!isOnline()) { // no connection, show warning messages
@@ -85,7 +85,7 @@ public class MainActivity extends Activity {
 
             startService(udpListeningIntent);
         } else {
-            Log.d("Main", "switch is checked off");
+            Log.d("Main", "SDN switch is checked off");
             stopService(udpListeningIntent);
             udpListeningIntent = null;
         }
