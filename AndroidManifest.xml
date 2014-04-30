@@ -8,12 +8,16 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.GET_TASKS"/>
 
-
-    <uses-sdk android:minSdkVersion="14"
+    <uses-sdk
+        android:minSdkVersion="14"
         android:targetSdkVersion="19" />
 
-    <application android:allowBackup="true"
+    <application
+        android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@android:style/Theme.Holo" >
@@ -27,9 +31,36 @@
             </intent-filter>
         </activity>
 
-        <service android:name="eit.sdn.sdncontroller.UDPListeningService"
-                android:exported="false" />
+        <!--
+        <receiver
+            android:name="eit.sdn.sdncontroller.DownloadListener"
+            android:exported="true" >
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+        -->
 
+        <service
+            android:name="eit.sdn.sdncontroller.UDPListeningService"
+            android:exported="false" />
+
+        <service
+            android:name="eit.sdn.sdncontroller.TrafficMonitoringService"
+            android:exported="false" />
+
+        <service
+            android:name="eit.sdn.sdncontroller.WifiScanningService"
+            android:exported="false" />
+
+        <activity
+            android:name="eit.sdn.sdncontroller.SettingsActivity"
+            android:label="@string/title_activity_settings"
+            android:parentActivityName="eit.sdn.sdncontroller.MainActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="eit.sdn.sdncontroller.MainActivity" />
+        </activity>
     </application>
 
 </manifest>
