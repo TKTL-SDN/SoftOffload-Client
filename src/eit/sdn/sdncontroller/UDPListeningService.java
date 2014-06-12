@@ -16,17 +16,17 @@
 
 package eit.sdn.sdncontroller;
 
-import java.io.IOException;
+
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.IntentService;
-import android.app.ActivityManager.RunningTaskInfo;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -38,7 +38,6 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
@@ -60,7 +59,12 @@ public class UDPListeningService extends IntentService {
     private int preNetId;
     private ConnectivityChangeReceiver connChangeReceiver; // used for switch detection
     private WifiScanReceiver wifiScanReceiver; // used for scan wifi ap
+
+    // for testing
     private Long startTimestamp;
+    private double appDelay;
+    private double scanDelay;
+    private int scanAPNum;
 
 
     // some defaults
@@ -95,11 +99,16 @@ public class UDPListeningService extends IntentService {
                     NetworkInfo nInfo = (NetworkInfo)extras.get("networkInfo");
                     if (nInfo.isConnected()) {
                         WifiInfo wInfo = (WifiInfo)extras.get("wifiInfo");
-                        if (wInfo.getSSID().equals(ssid)) {
-
+                        if (wInfo.getSSID().equals(ssid) || wInfo.getSSID().equals("\"" + ssid + "\"")) {
+                            Log.d("debug", "here");
                             long endTimestamp = System.currentTimeMillis();
-                            float delay = (endTimestamp - startTimestamp) / (float)1000.0;
-                            SDNCommonUtil.writeToExternalFile(Float.toString(delay), LOG_TAG, OUT_FILE);
+                            double delay = (endTimestamp - startTimestamp) / 1000.0;
+                            String line = Double.toString(appDelay + scanDelay + delay)
+                                            + ", " + Double.toString(appDelay)
+                                            + ", " + Double.toString(scanDelay)
+                                            + ", " + Double.toString(delay)
+                                            + ", " + Integer.toString(scanAPNum);
+                            SDNCommonUtil.writeToExternalFile(line, LOG_TAG, OUT_FILE);
 
                             CharSequence text = "Connected to WiFi network " + ssid;
                             int duration = Toast.LENGTH_LONG;
@@ -113,6 +122,30 @@ public class UDPListeningService extends IntentService {
 
                 } else {
                     Log.d(LOG_TAG, "no required extras info for connChangeReceiver");
+                }
+            } else {
+                Bundle extras = intent.getExtras();
+                if (extras != null) {
+                    NetworkInfo nInfo = (NetworkInfo)extras.get("networkInfo");
+                    if (nInfo.isConnected()) {
+                        StringBuilder sb = new StringBuilder();
+                        sb.append("a|time|");
+                        WifiManager wifiManager = (WifiManager)context.getSystemService(Context.WIFI_SERVICE);
+                        Log.d(LOG_TAG, "reconnection established");
+
+                        try {
+                            int dst = wifiManager.getDhcpInfo().gateway;
+                            InetAddress ipAddr = InetAddress.getByName(SDNCommonUtil.littleEndianIntToIpAddress(dst));
+                            Log.d(LOG_TAG, ipAddr.getHostAddress());
+                            new UDPSendingTask().execute(sb.toString(), ipAddr, AGENT_PORT);
+                        } catch (IllegalArgumentException e) {
+                            Log.e(LOG_TAG, "stop sending: can not using current IP address");
+                            e.printStackTrace();
+                        } catch (Exception e) {
+                            Log.e(LOG_TAG, "unknown udp sending error");
+                            e.printStackTrace();
+                        }
+                    }
                 }
             }
         }
@@ -136,7 +169,9 @@ public class UDPListeningService extends IntentService {
                 sb.append(mac);
 
                 List<ScanResult> scanResultList = wifiManager.getScanResults();
+                scanAPNum = 0;
                 for (ScanResult r: scanResultList) {
+                    scanAPNum++;
                     sb.append("|" + r.SSID + "&" + r.BSSID + "&" + r.level );
                 }
                 Log.d(LOG_TAG, "scan result message: " + sb.toString());
@@ -154,45 +189,13 @@ public class UDPListeningService extends IntentService {
                     e.printStackTrace();
                 }
 
+                long endT = System.currentTimeMillis();
+                scanDelay = (endT - startTimestamp) / 1000.0;
+
                 isServerAsked = false;
             }
         }
     }
-
-    /**
-     * AsyncTask class for sending udp packets.
-     *
-     * Android requires to execute networking operations in a different
-     * AsyncTask thread like this
-     *
-     */
-    private class UDPSendingTask extends AsyncTask<Object, Void, Void> {
-        String LOG_TAG = "UDPSendingTask";
-
-        @Override
-        protected Void doInBackground(Object... params) {
-            String message = (String)params[0];
-            InetAddress ip = (InetAddress)params[1];
-            int port = (Integer)params[2];
-            byte[] buf = message.getBytes();
-
-            try {
-                DatagramSocket socket = new DatagramSocket();
-                DatagramPacket packet = new DatagramPacket(buf, buf.length, ip, port);
-                socket.send(packet);
-                socket.close();
-            } catch (SocketException e) {
-                Log.e(LOG_TAG, "udp socket error");
-                e.printStackTrace();
-            } catch (IOException e) {
-                Log.e(LOG_TAG, "failed to send udp packet");
-                e.printStackTrace();
-            }
-            return null;
-        }
-
-    }
-
 
     /**
      * A required constructor for this service
@@ -247,6 +250,7 @@ public class UDPListeningService extends IntentService {
                 String msg_type = fields[0].toLowerCase();
 
                 if (msg_type.equals(MSG_SWITCH)) { // switch to another access point
+                    startTimestamp = System.currentTimeMillis();
                     wifiSwitch(fields);
 
                 } else if (msg_type.equals(MSG_SCAN)) { // using for ap scanning
@@ -256,8 +260,11 @@ public class UDPListeningService extends IntentService {
                     wifiManager.startScan();
                     Log.i(LOG_TAG, "starting wifi scanning...");
                 } else if (msg_type.equals(MSG_APP)) { // get running app info
+                    long startT = System.currentTimeMillis();
                     Log.i(LOG_TAG, "collecting running app info...");
                     getRunningAppInfo();
+                    long endT = System.currentTimeMillis();
+                    this.appDelay = (endT - startT) / 1000.0;
                 }
             }
 
@@ -341,7 +348,7 @@ public class UDPListeningService extends IntentService {
 
 
                 wifiManager.addNetwork(conf);
-                Log.d("test", "created new config successfully");
+                Log.d(LOG_TAG, "created new config successfully");
                 list = wifiManager.getConfiguredNetworks();
                 for(WifiConfiguration i : list) {
                     // Log.d("test", i.SSID);
@@ -368,10 +375,11 @@ public class UDPListeningService extends IntentService {
         Log.d(LOG_TAG, "trying to switch network...");
 
         wifiManager.disconnect();
-        wifiManager.enableNetwork(config.networkId, true);
-        wifiManager.reconnect();
         connChangeReceiver.ssid = config.SSID.replace("\"", "");
         connChangeReceiver.isServerAsked = true;
+        wifiManager.enableNetwork(config.networkId, true);
+        wifiManager.reconnect();
+
 
         for (int i = 0; i < DELAY_TIMES; i++) {
             SystemClock.sleep(DELAY_TIME_MS);
@@ -382,7 +390,8 @@ public class UDPListeningService extends IntentService {
                 // Log.d(LOG_TAG, wifiInfo.getSSID());
                 // Log.d(LOG_TAG, config.SSID);
 
-                if (("\"" + wifiInfo.getSSID() + "\"").equals(config.SSID)) {
+                if (("\"" + wifiInfo.getSSID() + "\"").equals(config.SSID)
+                        || wifiInfo.getSSID().equals(config.SSID)) {
                     return;
                 }
             }
@@ -416,13 +425,13 @@ public class UDPListeningService extends IntentService {
 
         List<ActivityManager.RunningServiceInfo> services = activityManager.getRunningServices(Integer.MAX_VALUE);
         for (ActivityManager.RunningServiceInfo i: services) {
-            if (i.service.toShortString().matches(".*DownloadService\\}")) {
+            if (i.service.toShortString().matches(".*android\\.providers.*DownloadService\\}")) {
                 Log.d(LOG_TAG, "running service: " + i.service.toShortString());
                 // String callingApp = context.getPackageManager().getNameForUid(i.uid);
                 // Log.d("app", "calling app: " + callingApp);
                 runningApp = "download";
                 break;
-            } else if (i.service.toShortString().matches(".*YouTube.*")) {
+            } else if (i.service.toShortString().matches(".*android\\.youtube.*")) {
                 Log.d(LOG_TAG, "running service: " + i.service.toShortString());
                 runningApp = "youtube";
             }

@@ -17,6 +17,7 @@
 package eit.sdn.sdncontroller;
 
 
+import java.net.InetAddress;
 import java.util.List;
 
 import android.app.Activity;
@@ -35,6 +36,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.TrafficStats;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.preference.PreferenceManager;
@@ -72,6 +74,7 @@ public class MainActivity extends Activity {
     // some defaults
     private String LOG_TAG = "SDNController";
     private String PREF_KEY_CLT_DETECTION = "pref_client_detection";
+    private String PREF_KEY_LOCAL_DOWNLOADING = "pref_local_downloading";
     private String SWITCH_WIFI_SCAN = "switchWifiScan";
     private String SWITCH_SDN = "switchSDN";
     private String BUTTON_DOWNLOAD = "buttonDownload";
@@ -355,7 +358,14 @@ public class MainActivity extends Activity {
 
 
         if (!isSDNDownloadStarted) {
-            String url = "http://download.virtualbox.org/virtualbox/4.3.10/virtualbox-4.3_4.3.10-93012~Ubuntu~raring_amd64.deb";
+            SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+            String url = "http://download.virtualbox.org/virtualbox/4.3.12/virtualbox-4.3_4.3.12-93733~Ubuntu~raring_amd64.deb";
+
+            if (sharedPrefs.getBoolean(PREF_KEY_CLT_DETECTION, false)) {
+                url = "http://192.168.0.1/files/virtualbox_local.deb";
+            }
+
+
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
             request.setDescription("file is downloading");
             request.setTitle("sdn-download.tmp");
@@ -377,6 +387,42 @@ public class MainActivity extends Activity {
 
             Button downloadButton = (Button)findViewById(R.id.button_download);
             downloadButton.setText("stop");
+
+            // latency testing code
+            long startRxBytes = TrafficStats.getTotalRxBytes();
+
+            while (true) {
+                try {
+                    Thread.sleep(200);
+                    long endRxBytes = TrafficStats.getTotalRxBytes();
+                    long rxBytes = endRxBytes - startRxBytes;
+                    startRxBytes = endRxBytes;
+                    if (rxBytes * 8 / 0.2 >= 1400000) {
+                        StringBuilder sb = new StringBuilder();
+                        sb.append("s|start|");
+                        WifiManager wifiManager = (WifiManager)this.getSystemService(Context.WIFI_SERVICE);
+
+                        int dst = wifiManager.getDhcpInfo().gateway;
+                        InetAddress ipAddr = InetAddress.getByName(SDNCommonUtil.littleEndianIntToIpAddress(dst));
+                        new UDPSendingTask().execute(sb.toString(), ipAddr, 6777);
+                        Log.i(LOG_TAG, "sent timestamp to agent " + ipAddr.getHostAddress());
+
+                        break;
+                    }
+                } catch (InterruptedException e1) {
+                    Log.e(LOG_TAG, "Thread.sleep failed");
+                    e1.printStackTrace();
+                } catch (IllegalArgumentException e) {
+                    Log.e(LOG_TAG, "stop sending timestamp: can not using current IP address");
+                    e.printStackTrace();
+                } catch (Exception e) {
+                    Log.e(LOG_TAG, "unknown error");
+                    e.printStackTrace();
+                }
+
+            }
+
+
         } else {
             isSDNDownloadStarted = false;
             Button downloadButton = (Button)findViewById(R.id.button_download);
