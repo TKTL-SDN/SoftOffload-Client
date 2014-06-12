@@ -361,7 +361,7 @@ public class MainActivity extends Activity {
             SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
             String url = "http://download.virtualbox.org/virtualbox/4.3.12/virtualbox-4.3_4.3.12-93733~Ubuntu~raring_amd64.deb";
 
-            if (sharedPrefs.getBoolean(PREF_KEY_CLT_DETECTION, false)) {
+            if (sharedPrefs.getBoolean(PREF_KEY_LOCAL_DOWNLOADING, false)) {
                 url = "http://192.168.0.1/files/virtualbox_local.deb";
             }
 
