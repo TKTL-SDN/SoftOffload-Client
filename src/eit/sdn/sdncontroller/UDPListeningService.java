@@ -310,58 +310,68 @@ public class UDPListeningService extends IntentService {
      * @param fields the splitted udp message
      */
     private void wifiSwitch(String[] fields) {
+        String ssid = fields[1];
+        String bssid = fields[2];
 
-        if (!fields[1].equals("")) {
+        if (!ssid.equals("") && !bssid.equals("")) {
 
             WifiManager wifiManager = (WifiManager)this.getSystemService(Context.WIFI_SERVICE);
             WifiInfo wifiInfo = wifiManager.getConnectionInfo();
             preNetId = wifiInfo.getNetworkId();
 
-            if (wifiInfo.getSSID() != null && wifiInfo.getSSID().equals(fields[1])) {
-                Log.i("UDPListeningService", "same ssid to current one, ignore the request");
-            } else {
-                // find corresponding config
-                List<WifiConfiguration> list = wifiManager.getConfiguredNetworks();
-                for(WifiConfiguration i : list) {
-                    // Log.d("test", i.SSID);
-                    if(i.SSID != null && i.SSID.equals("\"" + fields[1] + "\"")) {
-                        Log.d("UDPListeningService", "find existing config for ssid: " + fields[1]);
-                        connectWifiNetwork(wifiManager, i);
-                        return;
-                    }
-                }
+              if (wifiInfo.getBSSID() != null
+                  && wifiInfo.getBSSID().toLowerCase().equals(bssid.toLowerCase())) {
+                  Log.i("UDPListeningService", "same bssid to current one, ignore the request");
+              } else {
+                  // find corresponding config
+                  List<WifiConfiguration> list = wifiManager.getConfiguredNetworks();
+                  for(WifiConfiguration i : list) {
+                      // Log.d("test", i.SSID);
+                      if(i.SSID != null && i.SSID.equals("\"" + fields[1] + "\"")) {
+                          if(i.BSSID != null && i.BSSID.toLowerCase().equals(bssid.toLowerCase())) {
+                              Log.d("UDPListeningService", "find existing config for bssid: " + bssid);
+                          } else { // the same ssid with unmatched bssid
+                              Log.d("UDPListeningService", "bssid not match");
+                              i.BSSID = bssid;
+                          }
+
+                          connectWifiNetwork(wifiManager, i);
+                          return;
+                      }
+                  }
+
+                  // TODO this part of logic is not complete at all
+                  // not find existing config for the new bssid
+                  Log.d("UDPListeningService", "create new config for bssid: " + bssid);
+                  WifiConfiguration conf = new WifiConfiguration();
+                  conf.SSID = "\"" + ssid + "\"";
+                  conf.BSSID = bssid;
+                  if (fields[3].equals("open")) {
+                      conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+                  } else if (fields[3].equals("wep")) {
+                      // TODO add WEP condition
+                  } else if (fields[3].equals("wpa") && !fields[4].equals("")) {
+                      conf.preSharedKey = "\""+ fields[4] +"\"";
+                  } else {
+                      Log.w("UDPListeningService", "illegal mgt packet, ignore it");
+                      return;
+                  }
 
 
-                // TODO this part of logic is not complete at all
-                // not find existing config for the new ssid
-                Log.d("UDPListeningService", "create new config for ssid: " + fields[1]);
-                WifiConfiguration conf = new WifiConfiguration();
-                conf.SSID = "\"" + fields[1] + "\"";
-                if (fields[2].equals("open")) {
-                    conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
-                } else if (fields[2].equals("wep")) {
-                    // TODO add WEP condition
-                } else if (fields[2].equals("wpa") && !fields[3].equals("")) {
-                    conf.preSharedKey = "\""+ fields[3] +"\"";
-                } else {
-                    Log.w("UDPListeningService", "illegal mgt packet, ignore it");
-                    return;
-                }
+                  wifiManager.addNetwork(conf);
+                  Log.d(LOG_TAG, "created new config successfully");
+                  list = wifiManager.getConfiguredNetworks();
+                  for(WifiConfiguration i : list) {
+                      // Log.d("test", i.SSID);
+                      if(i.BSSID != null && i.BSSID.toLowerCase().equals(bssid.toLowerCase())) {
+                          connectWifiNetwork(wifiManager, i);
+                          break;
+                      }
+                  }
+              }
 
-
-                wifiManager.addNetwork(conf);
-                Log.d(LOG_TAG, "created new config successfully");
-                list = wifiManager.getConfiguredNetworks();
-                for(WifiConfiguration i : list) {
-                    // Log.d("test", i.SSID);
-                    if(i.SSID != null && i.SSID.equals("\"" + fields[1] + "\"")) {
-                        connectWifiNetwork(wifiManager, i);
-                        break;
-                    }
-                }
-            }
         } else {
-            Log.w("UDPListeningService", "Invalid SSID, ignore it");
+            Log.w("UDPListeningService", "Invalid BSSID, ignore it");
         }
     }
 
