@@ -422,7 +422,6 @@ public class MainActivity extends Activity {
 
             }
 
-
         } else {
             isSDNDownloadStarted = false;
             Button downloadButton = (Button)findViewById(R.id.button_download);

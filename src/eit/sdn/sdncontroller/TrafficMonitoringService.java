@@ -3,6 +3,7 @@
  */
 package eit.sdn.sdncontroller;
 
+import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -11,6 +12,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.TrafficStats;
 import android.os.IBinder;
+import android.text.format.DateFormat;
 import android.util.Log;
 
 /**
@@ -22,6 +24,7 @@ public class TrafficMonitoringService extends Service {
     private String logTag = "TrafficMonitoringService";
     // private Context context;
 
+    private String LOG_TAG = "TrafficMonitoringService";
 
     private class MonitoringTask extends TimerTask {
         private boolean isFirstTimeRunning = true;
@@ -39,6 +42,7 @@ public class TrafficMonitoringService extends Service {
                 long endTxBytes = TrafficStats.getTotalTxBytes();
                 long rxBytes = endRxBytes - startRxBytes;
                 long txBytes = endTxBytes - startTxBytes;
+
                 startRxBytes = endRxBytes;
                 startTxBytes = endTxBytes;
                 Log.d(logTag, "mobile recieve rx bytes: " + rxBytes);
@@ -58,7 +62,7 @@ public class TrafficMonitoringService extends Service {
 
         // context = this;
         Log.d(logTag, "traffic monitoring service started");
-        monitoringTimer.schedule(new MonitoringTask(), 0, 5000);
+        monitoringTimer.schedule(new MonitoringTask(), 0, 1000);
     }
 
     public void onDestroy() {
