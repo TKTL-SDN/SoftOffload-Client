@@ -13,8 +13,8 @@
     <uses-permission android:name="android.permission.GET_TASKS"/>
 
     <uses-sdk
-        android:minSdkVersion="14"
-        android:targetSdkVersion="19" />
+        android:minSdkVersion="16"
+        android:targetSdkVersion="21" />
 
     <application
         android:allowBackup="true"
@@ -50,7 +50,7 @@
             android:exported="false" />
 
         <service
-            android:name="eit.sdn.sdncontroller.WifiScanningService"
+            android:name=".DownloadService"
             android:exported="false" />
 
         <activity

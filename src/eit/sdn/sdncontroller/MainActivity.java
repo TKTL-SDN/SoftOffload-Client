@@ -24,8 +24,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.app.DownloadManager.Query;
+import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
@@ -39,6 +41,8 @@ import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.ResultReceiver;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.Menu;
@@ -61,9 +65,11 @@ public class MainActivity extends Activity {
     private Intent udpListeningIntent = null;
     private Intent trafficMonitoringIntent = null;
     private Intent wifiScanningIntent = null;
+    private Intent downloadIntent = null;
     private DownloadListener downloadListener;
     private Switch sdnSwitch;
     private Switch wifiScanSwitch;
+    private ProgressDialog mProgressDialog;
 
     private long downloadID;
     private boolean isSDNDownloadStarted;
@@ -74,7 +80,6 @@ public class MainActivity extends Activity {
     // some defaults
     private String LOG_TAG = "SDNController";
     private String PREF_KEY_CLT_DETECTION = "pref_client_detection";
-    private String PREF_KEY_LOCAL_DOWNLOADING = "pref_local_downloading";
     private String SWITCH_WIFI_SCAN = "switchWifiScan";
     private String SWITCH_SDN = "switchSDN";
     private String BUTTON_DOWNLOAD = "buttonDownload";
@@ -125,6 +130,25 @@ public class MainActivity extends Activity {
             }
         }
     }
+    
+    // used for showing download progress bar
+    private class DownloadReceiver extends ResultReceiver{
+        public DownloadReceiver(Handler handler) {
+            super(handler);
+        }
+
+        @Override
+        protected void onReceiveResult(int resultCode, Bundle resultData) {
+            super.onReceiveResult(resultCode, resultData);
+            if (resultCode == DownloadService.PROGRESS_CODE) {
+                int progressRatio = resultData.getInt("downloadProgress");
+                mProgressDialog.setProgress(progressRatio);
+                if (progressRatio == 100) {
+                    mProgressDialog.dismiss();
+                }
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -136,6 +160,24 @@ public class MainActivity extends Activity {
         wifiScanSwitch = (Switch) findViewById(R.id.switch_wifi_scan);
         wifiScanSwitch.setChecked(false);
 
+        // instantiate it within the onCreate method
+        mProgressDialog = new ProgressDialog(this);
+        mProgressDialog.setMessage("Downlaoding Files...");
+        mProgressDialog.setIndeterminate(true);
+        mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        mProgressDialog.setCancelable(true);
+        
+        mProgressDialog.setButton(DialogInterface.BUTTON_NEGATIVE, "Cancel", 
+            new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    stopService(wifiScanningIntent);
+                    downloadIntent = null;
+                    dialog.dismiss();
+                }
+            });
+        mProgressDialog.show();
+        
         isSDNDownloadStarted = getPreference(BUTTON_DOWNLOAD, this);
     }
 
@@ -240,8 +282,8 @@ public class MainActivity extends Activity {
         wifiScanSwitch.setChecked(getPreference(SWITCH_WIFI_SCAN, this));
 
         isSDNDownloadStarted = getPreference(BUTTON_DOWNLOAD, this);
-        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
-        downloadID = preferences.getLong(DOWNLOAD_ID, 0);
+        // SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        // downloadID = preferences.getLong(DOWNLOAD_ID, 0);
 
         if (isSDNDownloadStarted) {
             Button downloadButton = (Button)findViewById(R.id.button_download);
@@ -249,10 +291,10 @@ public class MainActivity extends Activity {
         }
 
         // register broadcast receiver
-        downloadListener = new DownloadListener();
-        IntentFilter intentFilter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
-        registerReceiver(downloadListener, intentFilter);
+        // downloadListener = new DownloadListener();
+        // IntentFilter intentFilter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        // intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
+        // registerReceiver(downloadListener, intentFilter);
     }
 
 
@@ -265,12 +307,12 @@ public class MainActivity extends Activity {
         setPreference(SWITCH_WIFI_SCAN, wifiScanSwitch.isChecked(), this);
 
         setPreference(BUTTON_DOWNLOAD, isSDNDownloadStarted, this);
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putLong(DOWNLOAD_ID, downloadID);
-        editor.commit();
+        // SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        // SharedPreferences.Editor editor = prefs.edit();
+        // editor.putLong(DOWNLOAD_ID, downloadID);
+        // editor.commit();
 
-        unregisterReceiver(downloadListener);
+        // unregisterReceiver(downloadListener);
     }
 
 //     @Override
@@ -347,15 +389,22 @@ public class MainActivity extends Activity {
     }
 
     public void controlDownload(View view) {
-
-        if (!isDownloadManagerAvailable(this)) {
-            CharSequence text = "Can not download the file now, please try it later!";
+        // Is mobile connected to some network?
+        if (!isOnline()) { // no connection, show warning messages
+            CharSequence text = "This device is not connected to any network";
             int duration = Toast.LENGTH_LONG;
+
             Toast toast = Toast.makeText(this, text, duration);
             toast.show();
-            return;
         }
-
+        
+        // fire the downloader
+        mProgressDialog.show();
+        downloadIntent = new Intent(this, DownloadService.class);
+        downloadIntent.putExtra("receiver", new DownloadReceiver(new Handler()));
+        startService(downloadIntent);
+        
+        
 
         if (!isSDNDownloadStarted) {
             SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -430,23 +479,6 @@ public class MainActivity extends Activity {
             DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
             manager.remove(downloadID);
             Log.d(LOG_TAG, "cancel downloading file");
-        }
-    }
-
-    /**
-     * @param context used to check the device version and DownloadManager information
-     * @return true if the download manager is available
-     */
-    public static boolean isDownloadManagerAvailable(Context context) {
-        try {
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.addCategory(Intent.CATEGORY_LAUNCHER);
-            intent.setClassName("com.android.providers.downloads.ui", "com.android.providers.downloads.ui.DownloadList");
-            List<ResolveInfo> list = context.getPackageManager().queryIntentActivities(intent,
-                    PackageManager.MATCH_DEFAULT_ONLY);
-            return list.size() > 0;
-        } catch (Exception e) {
-            return false;
         }
     }
 

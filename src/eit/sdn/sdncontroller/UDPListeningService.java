@@ -328,12 +328,13 @@ public class UDPListeningService extends IntentService {
                   for(WifiConfiguration i : list) {
                       // Log.d("test", i.SSID);
                       if(i.SSID != null && i.SSID.equals("\"" + fields[1] + "\"")) {
-                          if(i.BSSID != null && i.BSSID.toLowerCase().equals(bssid.toLowerCase())) {
-                              Log.d("UDPListeningService", "find existing config for bssid: " + bssid);
-                          } else { // the same ssid with unmatched bssid
-                              Log.d("UDPListeningService", "bssid not match");
-                              i.BSSID = bssid;
-                          }
+//                          if(i.BSSID != null && i.BSSID.toLowerCase().equals(bssid.toLowerCase())) {
+//                              Log.d("UDPListeningService", "find existing config for bssid: " + bssid);
+//                          } else { // the same ssid with unmatched bssid
+//                              Log.d("UDPListeningService", "original bssid: " + i.BSSID);
+//                              Log.d("UDPListeningService", "bssid not match");
+//                              i.BSSID = bssid;
+//                          }
 
                           connectWifiNetwork(wifiManager, i);
                           return;
