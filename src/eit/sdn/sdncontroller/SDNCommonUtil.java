@@ -10,11 +10,16 @@ import java.io.IOException;
 import java.io.PrintWriter;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
 import android.os.Environment;
 import android.util.Log;
 
 /**
+ * Here are some common functions which are always used in different
+ * activities and services
+ * 
  * @author Yanhe Liu <yanhe.liu@cs.helsinki.fi>
  *
  */
@@ -98,7 +103,7 @@ public class SDNCommonUtil {
     /**
      * Check whether wifi is enabled
      *
-     * @param
+     * @param activity context
      */
     public static boolean isWifiEnabled(Context c) {
         WifiManager wifiManager = (WifiManager)c.getSystemService(Context.WIFI_SERVICE);
@@ -106,4 +111,16 @@ public class SDNCommonUtil {
         return (wifiManager.isWifiEnabled());
     }
 
+    
+    /**
+     * Check whether wifi is enabled and connected
+     *
+     * @param activity context
+     */
+    public static boolean isOnline(Context c) {
+        ConnectivityManager connMgr = (ConnectivityManager)
+                c.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        return (networkInfo != null && networkInfo.isConnected());
+    }
 }

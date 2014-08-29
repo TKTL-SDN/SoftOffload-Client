@@ -21,9 +21,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.Date;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
@@ -42,7 +40,6 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
-import android.text.format.DateFormat;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -102,7 +99,6 @@ public class UDPListeningService extends IntentService {
                     if (nInfo.isConnected()) {
                         WifiInfo wInfo = (WifiInfo)extras.get("wifiInfo");
                         if (wInfo.getSSID().equals(ssid) || wInfo.getSSID().equals("\"" + ssid + "\"")) {
-                            Log.d("debug", "here");
                             long endTimestamp = System.currentTimeMillis();
                             double delay = (endTimestamp - startTimestamp) / 1000.0;
                             String line = Double.toString(appDelay + scanDelay + delay)

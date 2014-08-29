@@ -16,31 +16,16 @@
 
 package eit.sdn.sdncontroller;
 
-
-import java.net.InetAddress;
-import java.util.List;
-
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.DownloadManager;
-import android.app.DownloadManager.Query;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
-import android.database.Cursor;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.net.TrafficStats;
-import android.net.Uri;
-import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.ResultReceiver;
 import android.preference.PreferenceManager;
@@ -66,15 +51,10 @@ public class MainActivity extends Activity {
     private Intent trafficMonitoringIntent = null;
     private Intent wifiScanningIntent = null;
     private Intent downloadIntent = null;
-    private DownloadListener downloadListener;
     private Switch sdnSwitch;
     private Switch wifiScanSwitch;
     private ProgressDialog mProgressDialog;
-
-    private long downloadID;
     private boolean isSDNDownloadStarted;
-    private long startTime;
-
     private boolean isClientDetectionOn = false;
 
     // some defaults
@@ -83,53 +63,7 @@ public class MainActivity extends Activity {
     private String SWITCH_WIFI_SCAN = "switchWifiScan";
     private String SWITCH_SDN = "switchSDN";
     private String BUTTON_DOWNLOAD = "buttonDownload";
-    private String DOWNLOAD_ID = "downloadID";
-    private String OUT_FILE = "download.txt";
-
-    // FIXME this downloadlistener could not work right (for calculating the
-    // time interval) if this activity is stopped, and started again during
-    // file downloading. Right now the starttime var is only stored as a class
-    // var, not a SharedPreference, so if activity is restarted, the old value
-    // will be erased.
-    public class DownloadListener extends BroadcastReceiver {
-
-        // defaults
-        private String LOG_TAG = "DownloadListener";
-
-        @Override
-        public void onReceive(Context c, Intent intent) {
-            if (isSDNDownloadStarted) {
-                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, 0);
-                if (id == downloadID) {
-
-                    long endTime = System.currentTimeMillis();
-                    double interval = (endTime - startTime) / 1000.0;
-
-                    DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-                    Query query = new Query();
-                    query.setFilterById(id);
-                    Cursor cursor = manager.query(query);
-
-                    if (cursor.moveToFirst()) {
-                        int columnIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
-                        String bytes = cursor.getString(columnIndex);
-                        Log.d(LOG_TAG, "successfully downloaded tmp file...");
-                        Log.d(LOG_TAG, bytes + " bytes -- " + interval + "s");
-
-                        String text = bytes + " bytes -- " + interval + "s";
-                        SDNCommonUtil.writeToExternalFile(text, LOG_TAG, OUT_FILE);
-
-                        columnIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_FILENAME);
-                        SDNCommonUtil.removeExternalFile(cursor.getString(columnIndex), LOG_TAG);
-                    }
-
-                    Button downloadButton = (Button)findViewById(R.id.button_download);
-                    downloadButton.setText("start");
-                    isSDNDownloadStarted = false;
-                }
-            }
-        }
-    }
+    
     
     // used for showing download progress bar
     private class DownloadReceiver extends ResultReceiver{
@@ -141,9 +75,13 @@ public class MainActivity extends Activity {
         protected void onReceiveResult(int resultCode, Bundle resultData) {
             super.onReceiveResult(resultCode, resultData);
             if (resultCode == DownloadService.PROGRESS_CODE) {
-                int progressRatio = resultData.getInt("downloadProgress");
+                int progressRatio = resultData.getInt("progress");
                 mProgressDialog.setProgress(progressRatio);
+                
                 if (progressRatio == 100) {
+                    Button downloadButton = (Button)findViewById(R.id.button_download);
+                    downloadButton.setText("start");
+                    isSDNDownloadStarted = false;
                     mProgressDialog.dismiss();
                 }
             }
@@ -163,7 +101,7 @@ public class MainActivity extends Activity {
         // instantiate it within the onCreate method
         mProgressDialog = new ProgressDialog(this);
         mProgressDialog.setMessage("Downlaoding Files...");
-        mProgressDialog.setIndeterminate(true);
+        mProgressDialog.setIndeterminate(false);
         mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
         mProgressDialog.setCancelable(true);
         
@@ -171,12 +109,17 @@ public class MainActivity extends Activity {
             new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
-                    stopService(wifiScanningIntent);
-                    downloadIntent = null;
+                    if (downloadIntent != null) {
+                        stopService(downloadIntent);
+                        downloadIntent = null;
+                    }
+
+                    Button downloadButton = (Button)findViewById(R.id.button_download);
+                    downloadButton.setText("start");
+                    isSDNDownloadStarted = false;
                     dialog.dismiss();
                 }
             });
-        mProgressDialog.show();
         
         isSDNDownloadStarted = getPreference(BUTTON_DOWNLOAD, this);
     }
@@ -201,7 +144,7 @@ public class MainActivity extends Activity {
             Log.d("Main", "SDN switch is checked on");
 
             // Is mobile connected to some network?
-            if (!isOnline()) { // no connection, show warning messages
+            if (!SDNCommonUtil.isOnline(this)) { // no connection, show warning messages
                 CharSequence text = "This device is not connected to any network";
                 int duration = Toast.LENGTH_LONG;
 
@@ -282,19 +225,11 @@ public class MainActivity extends Activity {
         wifiScanSwitch.setChecked(getPreference(SWITCH_WIFI_SCAN, this));
 
         isSDNDownloadStarted = getPreference(BUTTON_DOWNLOAD, this);
-        // SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
-        // downloadID = preferences.getLong(DOWNLOAD_ID, 0);
-
+        
         if (isSDNDownloadStarted) {
             Button downloadButton = (Button)findViewById(R.id.button_download);
             downloadButton.setText("stop");
         }
-
-        // register broadcast receiver
-        // downloadListener = new DownloadListener();
-        // IntentFilter intentFilter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        // intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
-        // registerReceiver(downloadListener, intentFilter);
     }
 
 
@@ -307,24 +242,7 @@ public class MainActivity extends Activity {
         setPreference(SWITCH_WIFI_SCAN, wifiScanSwitch.isChecked(), this);
 
         setPreference(BUTTON_DOWNLOAD, isSDNDownloadStarted, this);
-        // SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        // SharedPreferences.Editor editor = prefs.edit();
-        // editor.putLong(DOWNLOAD_ID, downloadID);
-        // editor.commit();
-
-        // unregisterReceiver(downloadListener);
     }
-
-//     @Override
-//     public void onDestroy() {
-//         super.onDestroy();
-//
-//         // stop the udp listening thread
-//         if (udpListeningIntent != null) {
-//             stopService(udpListeningIntent);
-//         }
-//     }
-
 
 
     /**
@@ -356,18 +274,6 @@ public class MainActivity extends Activity {
         return preferences.getBoolean(key, false);
     }
 
-    /**
-     * Check whether wifi is enabled and connected
-     *
-     * @param
-     */
-    public boolean isOnline() {
-        ConnectivityManager connMgr = (ConnectivityManager)
-                getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-        return (networkInfo != null && networkInfo.isConnected());
-    }
-
 
     /** Called when the user clicks the Settings button */
     public void openSettings() {
@@ -388,96 +294,43 @@ public class MainActivity extends Activity {
         }
     }
 
+    
+    /**
+     * download a specific file via a background service 
+     * this func will be called when user clicks the download start/stop button
+     *
+     * @param view
+     */
     public void controlDownload(View view) {
-        // Is mobile connected to some network?
-        if (!isOnline()) { // no connection, show warning messages
-            CharSequence text = "This device is not connected to any network";
-            int duration = Toast.LENGTH_LONG;
-
-            Toast toast = Toast.makeText(this, text, duration);
-            toast.show();
-        }
         
-        // fire the downloader
-        mProgressDialog.show();
-        downloadIntent = new Intent(this, DownloadService.class);
-        downloadIntent.putExtra("receiver", new DownloadReceiver(new Handler()));
-        startService(downloadIntent);
-        
-        
-
         if (!isSDNDownloadStarted) {
-            SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
-            String url = "http://download.virtualbox.org/virtualbox/4.3.12/virtualbox-4.3_4.3.12-93733~Ubuntu~raring_amd64.deb";
+            // Is mobile connected to some network?
+            if (!SDNCommonUtil.isOnline(this)) { // no connection, show warning messages
+                CharSequence text = "This device is not connected to any network";
+                int duration = Toast.LENGTH_LONG;
 
-            if (sharedPrefs.getBoolean(PREF_KEY_LOCAL_DOWNLOADING, false)) {
-                url = "http://192.168.0.1/files/virtualbox_local.deb";
+                Toast toast = Toast.makeText(this, text, duration);
+                toast.show();
+                return;
             }
-
-
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            request.setDescription("file is downloading");
-            request.setTitle("sdn-download.tmp");
-            request.allowScanningByMediaScanner();
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "sdn-download.tmp");
-
-            // download existing file with the same name, or there will be an error with broadcast listener
-            String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath()
-                            + "/sdn-download.tmp";
-            SDNCommonUtil.removeExternalFile(path, LOG_TAG);
-
-            // get download service and enqueue file
-            DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-            downloadID = manager.enqueue(request);
-            isSDNDownloadStarted = true;
-            startTime = System.currentTimeMillis();
+            
+            // fire the downloader
+            mProgressDialog.show();
+            downloadIntent = new Intent(this, DownloadService.class);
+            downloadIntent.putExtra("receiver", new DownloadReceiver(new Handler()));
             Log.d(LOG_TAG, "start downloading tmp file...");
-
+            startService(downloadIntent);
+            
             Button downloadButton = (Button)findViewById(R.id.button_download);
             downloadButton.setText("stop");
-
-            // latency testing code
-            long startRxBytes = TrafficStats.getTotalRxBytes();
-
-            while (true) {
-                try {
-                    Thread.sleep(200);
-                    long endRxBytes = TrafficStats.getTotalRxBytes();
-                    long rxBytes = endRxBytes - startRxBytes;
-                    startRxBytes = endRxBytes;
-                    if (rxBytes * 8 / 0.2 >= 1400000) {
-                        StringBuilder sb = new StringBuilder();
-                        sb.append("s|start|");
-                        WifiManager wifiManager = (WifiManager)this.getSystemService(Context.WIFI_SERVICE);
-
-                        int dst = wifiManager.getDhcpInfo().gateway;
-                        InetAddress ipAddr = InetAddress.getByName(SDNCommonUtil.littleEndianIntToIpAddress(dst));
-                        new UDPSendingTask().execute(sb.toString(), ipAddr, 6777);
-                        Log.i(LOG_TAG, "sent timestamp to agent " + ipAddr.getHostAddress());
-
-                        break;
-                    }
-                } catch (InterruptedException e1) {
-                    Log.e(LOG_TAG, "Thread.sleep failed");
-                    e1.printStackTrace();
-                } catch (IllegalArgumentException e) {
-                    Log.e(LOG_TAG, "stop sending timestamp: can not using current IP address");
-                    e.printStackTrace();
-                } catch (Exception e) {
-                    Log.e(LOG_TAG, "unknown error");
-                    e.printStackTrace();
-                }
-
-            }
-
+            isSDNDownloadStarted = true;
+            mProgressDialog.show();
         } else {
+            stopService(downloadIntent);
             isSDNDownloadStarted = false;
             Button downloadButton = (Button)findViewById(R.id.button_download);
             downloadButton.setText("start");
-
-            DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-            manager.remove(downloadID);
+            
             Log.d(LOG_TAG, "cancel downloading file");
         }
     }
