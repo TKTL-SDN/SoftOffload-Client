@@ -16,8 +16,10 @@ import java.net.URL;
 
 import android.annotation.SuppressLint;
 import android.app.IntentService;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.ResultReceiver;
@@ -139,9 +141,15 @@ public class DownloadService extends IntentService {
             // write to download statistics
             Log.d(LOG_TAG, "finish file downloading with size " + total);
             if (!isCancelled) {
+                // timestamp
                 long endTime = System.currentTimeMillis();
                 double interval = (endTime - startTime) / 1000.0;
-                String text = total + " bytes -- " + interval + "s";
+                
+                // wifi signal level
+                WifiManager wifiManager = (WifiManager)this.getSystemService(Context.WIFI_SERVICE);
+                int level = wifiManager.getConnectionInfo().getRssi();
+                
+                String text = total + " bytes -- " + interval + "s -- " + level;
                 SDNCommonUtil.writeToExternalFile(text, LOG_TAG, LOG_FILE);
                 SDNCommonUtil.removeExternalFile(path, LOG_TAG);
             }
