@@ -38,6 +38,8 @@ public class DownloadService extends IntentService {
     private boolean isCancelled = false;
     private boolean isFinished = false;
     private long startTime; // used for calculating download time 
+    private long fileLength;
+    private boolean isFirstConnection = true;
     
     // default
     private String PREF_KEY_LOCAL_DOWNLOADING = "pref_local_downloading";
@@ -116,7 +118,9 @@ public class DownloadService extends IntentService {
             
             connection.connect();
             // this will be to show a 0-100% progress bar
-            int fileLength = connection.getContentLength();
+            if (isFirstConnection) {
+                fileLength = connection.getContentLength();
+            }
             
             // download the file
             input = new BufferedInputStream(connection.getInputStream());
@@ -156,6 +160,7 @@ public class DownloadService extends IntentService {
 
         } catch (SocketException e) { // lost connection
             Log.e(LOG_TAG, "socket error, try to resume downloading");
+            isFirstConnection = false;
             if (output != null) { // force OS to flush cached bytes to file
                 try {
                     output.close();

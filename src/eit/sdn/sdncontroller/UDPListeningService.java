@@ -82,6 +82,7 @@ public class UDPListeningService extends IntentService {
     private final String MSG_SCAN = "scan";
     private final String MSG_SWITCH = "switch";
     private final String MSG_APP = "app";
+    private final String MSG_WIFI_OFF = "wifioff";
 
 
     // broadcast receiver for network connection info
@@ -263,6 +264,13 @@ public class UDPListeningService extends IntentService {
                     getRunningAppInfo();
                     long endT = System.currentTimeMillis();
                     this.appDelay = (endT - startT) / 1000.0;
+                } else if (msg_type.equals(MSG_WIFI_OFF)) { // turn off wifi interface
+                    WifiManager wifiManager = (WifiManager) this.getSystemService(Context.WIFI_SERVICE);
+                    if(wifiManager.isWifiEnabled()){
+                      wifiManager.setWifiEnabled(false);
+                    }
+                    
+                    Log.i(LOG_TAG, "wifi is turned off");
                 }
             }
 
