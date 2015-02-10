@@ -16,6 +16,7 @@
 
 package eit.sdn.sdncontroller;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
@@ -29,6 +30,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
 import android.preference.PreferenceManager;
+import android.telephony.CellInfo;
+import android.telephony.CellInfoLte;
+import android.telephony.CellSignalStrengthLte;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -301,6 +306,7 @@ public class MainActivity extends Activity {
      *
      * @param view
      */
+    @SuppressLint("NewApi")
     public void controlDownload(View view) {
         
         if (!isSDNDownloadStarted) {
@@ -326,7 +332,10 @@ public class MainActivity extends Activity {
             isSDNDownloadStarted = true;
             mProgressDialog.show();
         } else {
-            stopService(downloadIntent);
+            if (downloadIntent != null) {
+                stopService(downloadIntent);
+                downloadIntent = null;
+            }            
             isSDNDownloadStarted = false;
             Button downloadButton = (Button)findViewById(R.id.button_download);
             downloadButton.setText("start");

@@ -135,7 +135,7 @@ public class UDPListeningService extends IntentService {
                         try {
                             int dst = wifiManager.getDhcpInfo().gateway;
                             InetAddress ipAddr = InetAddress.getByName(SDNCommonUtil.littleEndianIntToIpAddress(dst));
-                            Log.d(LOG_TAG, ipAddr.getHostAddress());
+                            Log.d(LOG_TAG, "current gateway: " + ipAddr.getHostAddress());
                             new UDPSendingTask().execute(sb.toString(), ipAddr, AGENT_PORT);
                         } catch (IllegalArgumentException e) {
                             Log.e(LOG_TAG, "stop sending: can not using current IP address");
@@ -155,30 +155,30 @@ public class UDPListeningService extends IntentService {
      *
      */
     private class WifiScanReceiver extends BroadcastReceiver {
-        public boolean isServerAsked = false;
-
+        public int scanRemainingNum = 0;
+        public StringBuilder scanResult;
+        
         public void onReceive(Context c, Intent intent) {
-
-            if (isServerAsked) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("s|scan|");
-
+            scanResult = new StringBuilder();
+            if (scanRemainingNum > 0) {
                 WifiManager wifiManager = (WifiManager)c.getSystemService(Context.WIFI_SERVICE);
+                scanResult.append("s|scan|");
                 String mac = wifiManager.getConnectionInfo().getMacAddress();
-                sb.append(mac);
-
+                scanResult.append(mac);
                 List<ScanResult> scanResultList = wifiManager.getScanResults();
                 scanAPNum = 0;
                 for (ScanResult r: scanResultList) {
                     scanAPNum++;
-                    sb.append("|" + r.SSID + "&" + r.BSSID + "&" + r.level );
+                    scanResult.append("|" + r.SSID + "&" + r.BSSID + "&" + r.level);
                 }
-                Log.d(LOG_TAG, "scan result message: " + sb.toString());
+                
+                Log.d(LOG_TAG, "scan result message: " + scanResult.toString());
 
+                // send reply
                 try {
                     int dst = wifiManager.getDhcpInfo().gateway;
                     InetAddress ipAddr = InetAddress.getByName(SDNCommonUtil.littleEndianIntToIpAddress(dst));
-                    new UDPSendingTask().execute(sb.toString(), ipAddr, AGENT_PORT);
+                    new UDPSendingTask().execute(scanResult.toString(), ipAddr, AGENT_PORT);
                     Log.i(LOG_TAG, "sent scan reply to agent " + ipAddr.getHostAddress());
                 } catch (IllegalArgumentException e) {
                     Log.e(LOG_TAG, "stop scan replying: can not using current IP address");
@@ -187,11 +187,15 @@ public class UDPListeningService extends IntentService {
                     Log.e(LOG_TAG, "unknown udp sending error");
                     e.printStackTrace();
                 }
-
-                long endT = System.currentTimeMillis();
-                scanDelay = (endT - startTimestamp) / 1000.0;
-
-                isServerAsked = false;
+                
+                if (--scanRemainingNum > 0) {
+                    SystemClock.sleep(600);
+                    wifiManager.startScan();
+                } else {
+                    long endT = System.currentTimeMillis();
+                    scanDelay = (endT - startTimestamp) / 1000.0;
+                    Log.d(LOG_TAG, "scan total delay: " + scanDelay + "s");
+                }
             }
         }
     }
@@ -255,7 +259,7 @@ public class UDPListeningService extends IntentService {
                 } else if (msg_type.equals(MSG_SCAN)) { // using for ap scanning
                     startTimestamp = System.currentTimeMillis();
                     WifiManager wifiManager = (WifiManager)this.getSystemService(Context.WIFI_SERVICE);
-                    wifiScanReceiver.isServerAsked = true;
+                    wifiScanReceiver.scanRemainingNum = 3;
                     wifiManager.startScan();
                     Log.i(LOG_TAG, "starting wifi scanning...");
                 } else if (msg_type.equals(MSG_APP)) { // get running app info
