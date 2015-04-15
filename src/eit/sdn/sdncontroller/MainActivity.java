@@ -52,6 +52,8 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
+    private static Context mContext;    
+    
     private Intent udpListeningIntent = null;
     private Intent trafficMonitoringIntent = null;
     private Intent wifiScanningIntent = null;
@@ -72,6 +74,7 @@ public class MainActivity extends Activity {
     
     // used for showing download progress bar
     private class DownloadReceiver extends ResultReceiver{
+        
         public DownloadReceiver(Handler handler) {
             super(handler);
         }
@@ -83,6 +86,19 @@ public class MainActivity extends Activity {
                 int progressRatio = resultData.getInt("progress");
                 mProgressDialog.setProgress(progressRatio);
                 
+                if (progressRatio == -1) {
+                    Button downloadButton = (Button)findViewById(R.id.button_download);
+                    downloadButton.setText("start");
+                    isSDNDownloadStarted = false;
+                    mProgressDialog.dismiss();
+                    
+                    // Log.d("CTX", getContext().toString());
+                    CharSequence text = "File is not found, please check the URL!";
+                    int duration = Toast.LENGTH_LONG;
+                    Toast toast = Toast.makeText(getContext(), text, duration);
+                    toast.show();
+                }
+                
                 if (progressRatio == 100) {
                     Button downloadButton = (Button)findViewById(R.id.button_download);
                     downloadButton.setText("start");
@@ -92,12 +108,20 @@ public class MainActivity extends Activity {
             }
         }
     }
+    
+    public static Context getContext() {
+        //  return context
+        return mContext;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        mContext = getApplication();
+        // Log.d("CTX", mContext.toString());
+        
+        
         sdnSwitch = (Switch) findViewById(R.id.switch_sdn);
         sdnSwitch.setChecked(false);
         wifiScanSwitch = (Switch) findViewById(R.id.switch_wifi_scan);
@@ -161,10 +185,10 @@ public class MainActivity extends Activity {
                 long startRX = TrafficStats.getTotalRxBytes();
                 long startTX = TrafficStats.getTotalTxBytes();
                 if (startRX == TrafficStats.UNSUPPORTED || startTX == TrafficStats.UNSUPPORTED) {
-                    AlertDialog.Builder alert = new AlertDialog.Builder(this);
-                    alert.setTitle("Warning");
-                    alert.setMessage("Your device does not support traffic stat monitoring.");
-                    alert.show();
+                    CharSequence text = "Your device does not support traffic stat monitoring.";
+                    int duration = Toast.LENGTH_LONG;
+                    Toast toast = Toast.makeText(this, text, duration);
+                    toast.show();
                 } else {
                     startService(trafficMonitoringIntent);
                     isClientDetectionOn = true;

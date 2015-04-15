@@ -17,12 +17,14 @@
     <string name="pref_recv_udp_port">UDP Listening Port (1024~65535)</string>
     <string name="pref_recv_udp_port_sum">7755</string>
     <string name="dialog_title_recv_udp_port">Enter your port number</string>
+    
+    <string name="pref_downloading_url">Downloading File URL</string>
+    <string name="pref_downloading_url_hint">http://</string>
+    <string name="pref_downloading_url_sum">http://192.168.0.1/files/small.tmp</string>
+    <string name="dialog_title_pref_downloading_url">Enter your URL</string>
 
     <string name="pref_client_detection">Client Traffic Detection</string>
     <string name="pref_client_detection_sum">Enable/disable client traffic detection</string>
-
-    <string name="pref_local_downloading">Local Downloading</string>
-    <string name="pref_local_downloading_sum">Enable local downloading test</string>
 
     <string name="pref_wifi_scan_interval_sum">10s</string>
     <string name="pref_wifi_scan_interval">WiFi Scanning Interval</string>

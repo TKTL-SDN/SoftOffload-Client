@@ -5,6 +5,7 @@ package eit.sdn.sdncontroller;
 
 import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,7 +50,9 @@ public class DownloadService extends IntentService {
     private boolean isFirstConnection = true;
     
     // default
-    private String PREF_KEY_LOCAL_DOWNLOADING = "pref_local_downloading";
+    private String PREF_DOWNLOADING_URL_KEY = "pref_downloading_url";
+    private String DOWNLOADING_URL = "http://www.cs.helsinki.fi/group/eit-sdn/testing/tiny.tmp";
+    
     private String LOG_TAG = "DownloadService";
     private int MAX_BUFF = 10240;
     public static final int PROGRESS_CODE = 8344;
@@ -74,17 +77,9 @@ public class DownloadService extends IntentService {
     @Override
     protected void onHandleIntent(Intent intent) {
         // download file url
-        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
-        // String urlToDownload = "http://download.virtualbox.org/virtualbox/4.3.12/virtualbox-4.3_4.3.12-93733~Ubuntu~raring_amd64.deb";
-        // String urlToDownload = "http://download.angrybirds.com/games/BadPiggies/BadPiggiesInstaller_1.5.1.exe";
-        // String urlToDownload = "http://download.virtualbox.org/virtualbox/4.3.18/Oracle_VM_VirtualBox_Extension_Pack-4.3.18-96516.vbox-extpack";
-        String urlToDownload = "http://www.cs.helsinki.fi/group/eit-sdn/files/tiny.tmp";
-        
-        // this is the local url
-        if (sharedPrefs.getBoolean(PREF_KEY_LOCAL_DOWNLOADING, false)) {
-            // urlToDownload = "http://192.168.1.21/files/small.tmp";
-            urlToDownload = "http://192.168.0.1/files/medium.tmp";
-        }
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String urlToDownload = prefs.getString(PREF_DOWNLOADING_URL_KEY, DOWNLOADING_URL);
+        Log.d(LOG_TAG, "download file url: " + urlToDownload);
         
         // download existing file with the same name
         // remove the old one every time when this service starts
@@ -219,6 +214,13 @@ public class DownloadService extends IntentService {
                     fileDownload(urlToDownload, path, receiver);
                 }
             }
+        } catch (FileNotFoundException e) {    
+            // publishing the progress....
+            Bundle resultData = new Bundle();
+            resultData.putInt("progress", (int)-1);
+            receiver.send(PROGRESS_CODE, resultData);
+            Log.e(LOG_TAG, "download file is not found!");
+            e.printStackTrace();
         } catch (SocketTimeoutException e) {
             Log.e(LOG_TAG, "download connection timeout");
             e.printStackTrace();

@@ -1,5 +1,8 @@
 package eit.sdn.sdncontroller;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
@@ -15,9 +18,17 @@ import android.widget.Toast;
 
 public class SettingsActivity extends PreferenceActivity implements OnSharedPreferenceChangeListener {
 
+    // udp port
     private String UDP_PORT_KEY = "recv_udp_port";
     private String DEFAULT_UDP_PORT = "7755";
     // private String DEFAULT_SCAN_INTERVAL = "10";
+    
+    // downloading url
+    private String DOWNLOADING_URL_KEY = "pref_downloading_url";
+    private String DOWNLOADING_URL = "http://www.cs.helsinki.fi/group/eit-sdn/testing/tiny.tmp";
+    private String urlPattern = "^(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]";
+    
+    // others
     private String WIFI_SCAN_INTERVAL = "pref_wifi_scan_interval";
     private String CONNECTING_TEST_TIMEOUT = "pref_connecting_test_timeout";
     private String logTag = "SettingsActivity";
@@ -44,7 +55,7 @@ public class SettingsActivity extends PreferenceActivity implements OnSharedPref
             prefConnectTimeout.setSummary(timeout + "ms");
         }
 
-
+        // udp port
         EditTextPreference editTextPref = (EditTextPreference) findPreference(UDP_PORT_KEY);
         String portString = pref.getString(UDP_PORT_KEY, DEFAULT_UDP_PORT);
         int udpServerPort = Integer.parseInt(portString);
@@ -59,7 +70,24 @@ public class SettingsActivity extends PreferenceActivity implements OnSharedPref
             editor.putString(UDP_PORT_KEY, DEFAULT_UDP_PORT);
             editor.commit();
         }
+        
+        // url
+        editTextPref = (EditTextPreference) findPreference(DOWNLOADING_URL_KEY);
+        String url = pref.getString(DOWNLOADING_URL_KEY, DOWNLOADING_URL);
+        
+        Pattern r = Pattern.compile(urlPattern);
+        Matcher m = r.matcher(url);
+        if (m.find()) {
+            editTextPref.setSummary(url);
+        } else {
+            editTextPref.setSummary(DOWNLOADING_URL);
 
+            // set back to default
+            SharedPreferences settings = getSharedPreferences(DOWNLOADING_URL_KEY, MODE_PRIVATE);
+            SharedPreferences.Editor editor = settings.edit();
+            editor.putString(DOWNLOADING_URL_KEY, DOWNLOADING_URL);
+            editor.commit();
+        }
     }
 
     @SuppressWarnings("deprecation")
@@ -83,7 +111,7 @@ public class SettingsActivity extends PreferenceActivity implements OnSharedPref
         @SuppressWarnings("deprecation")
         Preference pref = findPreference(arg1);
 
-        if (pref instanceof EditTextPreference && arg1.equals("recv_udp_port")) {
+        if (pref instanceof EditTextPreference && arg1.equals(UDP_PORT_KEY)) {
             EditTextPreference text = (EditTextPreference) pref;
 
             String portString = text.getText();
@@ -117,7 +145,30 @@ public class SettingsActivity extends PreferenceActivity implements OnSharedPref
                 editor.commit();
                 pref.setSummary(DEFAULT_UDP_PORT);
             }
+        
+        } else if (pref instanceof EditTextPreference && arg1.equals(DOWNLOADING_URL_KEY)) {
+            EditTextPreference text = (EditTextPreference) pref;
 
+            String url = text.getText();
+            Pattern r = Pattern.compile(urlPattern);
+            Matcher m = r.matcher(url);
+            if (m.find()) {
+                pref.setSummary(text.getText());
+                Log.i(logTag, "set downloading url to " + text.getText());
+            } else {
+                CharSequence message = "illegal url, set back to default!";
+                int duration = Toast.LENGTH_LONG;
+                Toast toast = Toast.makeText(this, message, duration);
+                toast.show();
+
+                // set back to default
+                SharedPreferences settings = getSharedPreferences(DOWNLOADING_URL_KEY, MODE_PRIVATE);
+                SharedPreferences.Editor editor = settings.edit();
+                editor.putString(DOWNLOADING_URL_KEY, DOWNLOADING_URL);
+                editor.commit();
+                pref.setSummary(DOWNLOADING_URL);
+            }
+            
         } else if (arg1.equals(WIFI_SCAN_INTERVAL)) {
             ListPreference prefScanInterval = (ListPreference) pref;
 
