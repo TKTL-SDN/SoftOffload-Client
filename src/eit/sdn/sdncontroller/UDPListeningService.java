@@ -21,6 +21,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.LinkedList;
 import java.util.List;
 
 import android.annotation.SuppressLint;
@@ -31,6 +32,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.ScanResult;
@@ -51,7 +56,7 @@ import android.widget.Toast;
  *
  **/
 
-public class UDPListeningService extends IntentService {
+public class UDPListeningService extends IntentService implements SensorEventListener {
 
     private boolean isEnabled = true;
     private DatagramSocket socket = null;
@@ -59,12 +64,20 @@ public class UDPListeningService extends IntentService {
     private ConnectivityChangeReceiver connChangeReceiver; // used for switch detection
     private WifiScanReceiver wifiScanReceiver; // used for scan wifi ap
 
+    
     // for testing
     private Long startTimestamp;
     private double appDelay;
     private double scanDelay;
     private int scanAPNum;
 
+    // acc sensor
+    private int sensorStatCount = 0;
+    private SensorManager sensorManager;
+    private List<Float> valueX = new LinkedList<Float>();
+    private List<Float> valueY = new LinkedList<Float>();
+    private List<Float> valueZ = new LinkedList<Float>();
+    private boolean motionDetected = false;
 
     // some defaults
     private String LOG_TAG = "UDPListeningService";
@@ -79,6 +92,7 @@ public class UDPListeningService extends IntentService {
     private int DELAY_TIMES = 2;
 
     // Message types
+    private final String MSG_MOTION = "motion";
     private final String MSG_SCAN = "scan";
     private final String MSG_SWITCH = "switch";
     private final String MSG_APP = "app";
@@ -157,14 +171,38 @@ public class UDPListeningService extends IntentService {
     private class WifiScanReceiver extends BroadcastReceiver {
         public int scanRemainingNum = 0;
         public StringBuilder scanResult;
+        public boolean isStatic = false;
         
         public void onReceive(Context c, Intent intent) {
             scanResult = new StringBuilder();
+            
             if (scanRemainingNum > 0) {
-                WifiManager wifiManager = (WifiManager)c.getSystemService(Context.WIFI_SERVICE);
+                
+                if (scanRemainingNum == 3) {
+                    for(int i = 0; i < 4 && !motionDetected; i++) {
+                        SystemClock.sleep(500);
+                        Log.d(LOG_TAG, "motion detection is not finished");
+                    }
+                    
+                    if (isStatic()) {
+                        scanRemainingNum = 1;
+                        isStatic = true;
+                        Log.i(LOG_TAG, "static device, only one-turn scanning is enough!");
+                    } else {
+                        Log.i(LOG_TAG, "moving device, three-turn scanning is performed!");
+                    }
+                }
+                
                 scanResult.append("s|scan|");
+                WifiManager wifiManager = (WifiManager)c.getSystemService(Context.WIFI_SERVICE);
                 String mac = wifiManager.getConnectionInfo().getMacAddress();
                 scanResult.append(mac);
+                if (isStatic) {
+                    scanResult.append("|static");
+                } else {
+                    scanResult.append("|other");
+                }
+                
                 List<ScanResult> scanResultList = wifiManager.getScanResults();
                 scanAPNum = 0;
                 for (ScanResult r: scanResultList) {
@@ -189,13 +227,15 @@ public class UDPListeningService extends IntentService {
                 }
                 
                 if (--scanRemainingNum > 0) {
-                    SystemClock.sleep(600);
+                    SystemClock.sleep(500);
                     wifiManager.startScan();
                 } else {
                     long endT = System.currentTimeMillis();
                     scanDelay = (endT - startTimestamp) / 1000.0;
                     Log.d(LOG_TAG, "scan total delay: " + scanDelay + "s");
                 }
+                
+                isStatic = false;
             }
         }
     }
@@ -226,6 +266,9 @@ public class UDPListeningService extends IntentService {
         wifiScanReceiver = new WifiScanReceiver();
         registerReceiver(wifiScanReceiver,
                 new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+        
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        Sensor sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String portString = prefs.getString(UDP_SERVER_PORT_KEY, UDP_SERVER_PORT_DEFAULT);
@@ -275,6 +318,13 @@ public class UDPListeningService extends IntentService {
                     }
                     
                     Log.i(LOG_TAG, "wifi is turned off");
+                } else if (msg_type.equals(MSG_MOTION)) {
+                    valueX.clear();
+                    valueY.clear();
+                    valueZ.clear();
+                    sensorStatCount = 0;
+                    motionDetected = false;
+                    sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL);
                 }
             }
 
@@ -302,6 +352,7 @@ public class UDPListeningService extends IntentService {
     @Override
     public void onDestroy() {
         stopListening();
+        sensorManager.unregisterListener(this);
         unregisterReceiver(connChangeReceiver);
         unregisterReceiver(wifiScanReceiver);
         Log.d("UDPListeningService", "UDP receiver successfully stopped.");
@@ -482,5 +533,64 @@ public class UDPListeningService extends IntentService {
 
     }
 
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        valueX.add(event.values[0]);
+        valueY.add(event.values[1]);
+        valueZ.add(event.values[2]);
+        sensorStatCount++;
+        // Log.d(LOG_TAG, "acc sensor changed: " + event.values[0] + ", " + event.values[1] + ", " + event.values[2]);
+        
+        if (sensorStatCount >= 12) {
+            sensorManager.unregisterListener(this);
+            sensorStatCount = 0;
+            motionDetected = true;
+            Log.d(LOG_TAG, "finish motion detection");
+        }
+        
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // TODO Auto-generated method stub
+    }
+
+    double getMean(List<Float> values) {
+        double sum = 0;
+        int size = 0;
+        for(double value: values) {
+            sum += value;
+            size += 1;
+        }
+        return sum/size;
+    }
+    
+    double getStdDev(double mean, List<Float> values) {
+        double temp = 0;
+        int size = 0;
+        for(double value: values) {
+            temp += (mean - value) * (mean - value);
+            size += 1;
+        }
+        
+        return Math.sqrt(temp/size);
+    }
+    
+    boolean isStatic() {
+        boolean result = false;
+        
+        double meanX = getMean(valueX);
+        double meanY = getMean(valueY);
+        double meanZ = getMean(valueZ);
+        double stdDevX = getStdDev(meanX, valueX);
+        double stdDevY = getStdDev(meanY, valueY);
+        double stdDevZ = getStdDev(meanZ, valueZ);
+        
+        if (stdDevX < 0.1 && stdDevY < 0.1 && stdDevZ < 0.1) {
+            result = true;
+        }
+        
+        return result;
+    }
 
 }
