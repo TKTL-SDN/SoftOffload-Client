@@ -230,11 +230,13 @@ public class DownloadService extends IntentService {
             }
         } catch (FileNotFoundException e) {    
             // publishing the progress....
-            Bundle resultData = new Bundle();
-            resultData.putInt("progress", (int)-1);
-            receiver.send(PROGRESS_CODE, resultData);
-            Log.e(LOG_TAG, "download file is not found!");
-            e.printStackTrace();
+            if (isFirstConnection) {
+                Bundle resultData = new Bundle();
+                resultData.putInt("progress", (int)-1);
+                receiver.send(PROGRESS_CODE, resultData);
+                Log.e(LOG_TAG, "download file is not found!");
+                e.printStackTrace();
+            }
         } catch (SocketTimeoutException e) {
             Log.e(LOG_TAG, "download connection timeout");
             e.printStackTrace();

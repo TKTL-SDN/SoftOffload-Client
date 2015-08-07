@@ -16,24 +16,25 @@
 
 package eit.sdn.sdncontroller;
 
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.TrafficStats;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
 import android.preference.PreferenceManager;
-import android.telephony.CellInfo;
-import android.telephony.CellInfoLte;
-import android.telephony.CellSignalStrengthLte;
-import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -63,6 +64,8 @@ public class MainActivity extends Activity {
     private ProgressDialog mProgressDialog;
     private boolean isSDNDownloadStarted;
     private boolean isClientDetectionOn = false;
+    
+    ConnectivityChangeReceiver connChangeReceiver = new ConnectivityChangeReceiver();
 
     // some defaults
     private String LOG_TAG = "SDNController";
@@ -104,6 +107,9 @@ public class MainActivity extends Activity {
                     downloadButton.setText("start");
                     isSDNDownloadStarted = false;
                     mProgressDialog.dismiss();
+                    
+                    // unregisterReceiver(connChangeReceiver);
+                    
                 }
             }
         }
@@ -355,16 +361,45 @@ public class MainActivity extends Activity {
             downloadButton.setText("stop");
             isSDNDownloadStarted = true;
             mProgressDialog.show();
+            
+            registerReceiver(connChangeReceiver,
+                    new IntentFilter(WifiManager.NETWORK_STATE_CHANGED_ACTION));
         } else {
             if (downloadIntent != null) {
                 stopService(downloadIntent);
                 downloadIntent = null;
-            }            
+            }
             isSDNDownloadStarted = false;
             Button downloadButton = (Button)findViewById(R.id.button_download);
             downloadButton.setText("start");
+            unregisterReceiver(connChangeReceiver);
             
             Log.d(LOG_TAG, "cancel downloading file");
+        }
+    }
+    
+    
+    // broadcast receiver for network connection info
+    private class ConnectivityChangeReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Bundle extras = intent.getExtras();
+            if (extras != null && isSDNDownloadStarted) {
+                NetworkInfo nInfo = (NetworkInfo)extras.get("networkInfo");
+                if (nInfo.isConnected()) {
+                    int type = nInfo.getType();
+                    if (type == ConnectivityManager.TYPE_MOBILE) {
+                        // add later
+                    } else if (type == ConnectivityManager.TYPE_WIFI) {
+                        WifiInfo wInfo = (WifiInfo)extras.get("wifiInfo");
+                        String ssid = wInfo.getSSID();
+                        String bssid = wInfo.getBSSID();
+                        
+                        mProgressDialog.setMessage("Downlaoding Files via " + ssid + "(" + bssid + ")");
+                    }
+                }
+            
+            }
         }
     }
 
