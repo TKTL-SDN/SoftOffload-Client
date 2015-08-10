@@ -53,7 +53,7 @@ public class SettingsActivity extends PreferenceActivity implements OnSharedPref
     // others
     private String WIFI_SCAN_INTERVAL = "pref_wifi_scan_interval";
     private String CONNECTING_TEST_TIMEOUT = "pref_connecting_test_timeout";
-    private String logTag = "SettingsActivity";
+    private String logTag = SDNCommonUtil.LOG_TAG;
 
     @SuppressWarnings("deprecation")
     @Override

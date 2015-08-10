@@ -25,6 +25,9 @@
 
     <string name="pref_client_detection">Client Traffic Detection</string>
     <string name="pref_client_detection_sum">Enable/disable client traffic detection</string>
+    
+    <string name="pref_motion_detection">Device Motion Detection</string>
+    <string name="pref_motion_detection_sum">Enable/disable motion detection</string>
 
     <string name="pref_wifi_scan_interval_sum">10s</string>
     <string name="pref_wifi_scan_interval">WiFi Scanning Interval</string>

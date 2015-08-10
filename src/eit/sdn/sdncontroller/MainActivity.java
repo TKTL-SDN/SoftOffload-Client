@@ -68,7 +68,7 @@ public class MainActivity extends Activity {
     ConnectivityChangeReceiver connChangeReceiver = new ConnectivityChangeReceiver();
 
     // some defaults
-    private String LOG_TAG = "SDNController";
+    private String LOG_TAG = SDNCommonUtil.LOG_TAG;
     private String PREF_KEY_CLT_DETECTION = "pref_client_detection";
     private String SWITCH_WIFI_SCAN = "switchWifiScan";
     private String SWITCH_SDN = "switchSDN";
@@ -176,7 +176,7 @@ public class MainActivity extends Activity {
         boolean on = ((Switch) view).isChecked();
 
         if (on) {
-            Log.d("Main", "SDN switch is checked on");
+            Log.d(LOG_TAG, "SDN switch is checked on");
 
             // Is mobile connected to some network?
             if (!SDNCommonUtil.isOnline(this)) { // no connection, show warning messages
@@ -203,7 +203,7 @@ public class MainActivity extends Activity {
 
             startService(udpListeningIntent);
         } else {
-            Log.d("Main", "SDN switch is checked off");
+            Log.d(LOG_TAG, "SDN switch is checked off");
 
             if (isClientDetectionOn) {
                 stopService(trafficMonitoringIntent);

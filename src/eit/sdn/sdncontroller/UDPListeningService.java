@@ -72,6 +72,7 @@ public class UDPListeningService extends IntentService implements SensorEventLis
     private int scanAPNum;
 
     // acc sensor
+    private boolean enableMotionDetection = false;
     private int sensorStatCount = 0;
     private SensorManager sensorManager;
     private List<Float> valueX = new LinkedList<Float>();
@@ -80,7 +81,7 @@ public class UDPListeningService extends IntentService implements SensorEventLis
     private boolean motionDetected = false;
 
     // some defaults
-    private String LOG_TAG = "UDPListeningService";
+    private String LOG_TAG = SDNCommonUtil.LOG_TAG;
     private String OUT_FILE = "result.txt";
     private int MAX_BUF_LEN = 1024;
     private String UDP_SERVER_PORT_KEY = "recv_udp_port";
@@ -90,7 +91,8 @@ public class UDPListeningService extends IntentService implements SensorEventLis
     private String TOKEN = "\\|";
     private long DELAY_TIME_MS = 12000;
     private int DELAY_TIMES = 2;
-
+    private String PREF_MOTION_DETECTION = "pref_motion_detection";
+    
     // Message types
     private final String MSG_MOTION = "motion";
     private final String MSG_SCAN = "scan";
@@ -178,7 +180,7 @@ public class UDPListeningService extends IntentService implements SensorEventLis
             
             if (scanRemainingNum > 0) {
                 
-                if (scanRemainingNum == 3) {
+                if (scanRemainingNum == 3 && enableMotionDetection) {
                     for(int i = 0; i < 4 && !motionDetected; i++) {
                         SystemClock.sleep(500);
                         Log.d(LOG_TAG, "motion detection is not finished");
@@ -191,6 +193,8 @@ public class UDPListeningService extends IntentService implements SensorEventLis
                     } else {
                         Log.i(LOG_TAG, "moving device, three-turn scanning is performed!");
                     }
+                } else if (!enableMotionDetection) {
+                    isStatic = true;
                 }
                 
                 scanResult.append("s|scan|");
@@ -273,6 +277,9 @@ public class UDPListeningService extends IntentService implements SensorEventLis
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String portString = prefs.getString(UDP_SERVER_PORT_KEY, UDP_SERVER_PORT_DEFAULT);
         int udpServerPort = Integer.parseInt(portString);
+        enableMotionDetection = prefs.getBoolean(PREF_MOTION_DETECTION, false);
+        
+        // Log.i(LOG_TAG, "Motion Detection: " + enableMotionDetection);
 
         if (udpServerPort < 1024 || udpServerPort > 65535) {
             udpServerPort = UDP_SERVER_PORT;
@@ -302,7 +309,12 @@ public class UDPListeningService extends IntentService implements SensorEventLis
                 } else if (msg_type.equals(MSG_SCAN)) { // using for ap scanning
                     startTimestamp = System.currentTimeMillis();
                     WifiManager wifiManager = (WifiManager)this.getSystemService(Context.WIFI_SERVICE);
-                    wifiScanReceiver.scanRemainingNum = 3;
+                    if (enableMotionDetection) {
+                        wifiScanReceiver.scanRemainingNum = 3;
+                    } else {
+                        wifiScanReceiver.scanRemainingNum = 1;
+                    }
+                    
                     wifiManager.startScan();
                     Log.i(LOG_TAG, "starting wifi scanning...");
                 } else if (msg_type.equals(MSG_APP)) { // get running app info
@@ -318,7 +330,7 @@ public class UDPListeningService extends IntentService implements SensorEventLis
                     }
                     
                     Log.i(LOG_TAG, "wifi is turned off");
-                } else if (msg_type.equals(MSG_MOTION)) {
+                } else if (msg_type.equals(MSG_MOTION) && enableMotionDetection) {
                     valueX.clear();
                     valueY.clear();
                     valueZ.clear();
@@ -402,7 +414,7 @@ public class UDPListeningService extends IntentService implements SensorEventLis
 
                   // TODO this part of logic is not complete at all
                   // not find existing config for the new bssid
-                  Log.d("UDPListeningService", "create new config for bssid: " + bssid);
+                  Log.d(LOG_TAG, "create new config for bssid: " + bssid);
                   WifiConfiguration conf = new WifiConfiguration();
                   conf.SSID = "\"" + ssid + "\"";
                   conf.BSSID = bssid;
@@ -413,7 +425,7 @@ public class UDPListeningService extends IntentService implements SensorEventLis
                   } else if (fields[3].equals("wpa") && !fields[4].equals("")) {
                       conf.preSharedKey = "\""+ fields[4] +"\"";
                   } else {
-                      Log.w("UDPListeningService", "illegal mgt packet, ignore it");
+                      Log.w(LOG_TAG, "illegal mgt packet, ignore it");
                       return;
                   }
 
@@ -431,7 +443,7 @@ public class UDPListeningService extends IntentService implements SensorEventLis
               }
 
         } else {
-            Log.w("UDPListeningService", "Invalid BSSID, ignore it");
+            Log.w(LOG_TAG, "Invalid BSSID, ignore it");
         }
     }
 

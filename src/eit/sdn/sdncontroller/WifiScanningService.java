@@ -64,7 +64,7 @@ public class WifiScanningService extends IntentService {
     private Map<String, Integer> testedAPMap = new ConcurrentHashMap<String, Integer>();
 
     // defaults
-    private String LOG_TAG = "WifiScanningService";
+    private String LOG_TAG = SDNCommonUtil.LOG_TAG;
     private String LOG_FILE = "log.txt";
     private String WIFI_LIST_FILE = "wifi.txt";
     private String FREE_WIFI_FILE = "open-wifi.txt";

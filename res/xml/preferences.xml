@@ -15,6 +15,12 @@
             android:summary="@string/pref_client_detection_sum"
             android:title="@string/pref_client_detection" />
         
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="pref_motion_detection"
+            android:summary="@string/pref_motion_detection_sum"
+            android:title="@string/pref_motion_detection" />
+        
         <EditTextPreference
           android:key="pref_downloading_url"
           android:title="@string/pref_downloading_url"

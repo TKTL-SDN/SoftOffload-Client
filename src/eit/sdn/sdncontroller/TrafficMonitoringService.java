@@ -16,16 +16,13 @@
 
 package eit.sdn.sdncontroller;
 
-import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.net.TrafficStats;
 import android.os.IBinder;
-import android.text.format.DateFormat;
 import android.util.Log;
 
 /**
@@ -35,10 +32,8 @@ import android.util.Log;
  */
 public class TrafficMonitoringService extends Service {
     private Timer monitoringTimer = new Timer();
-    private String logTag = "TrafficMonitoringService";
+    private String logTag = SDNCommonUtil.LOG_TAG;
     // private Context context;
-
-    private String LOG_TAG = "TrafficMonitoringService";
 
     private class MonitoringTask extends TimerTask {
         private boolean isFirstTimeRunning = true;

@@ -37,7 +37,7 @@ import android.util.Log;
  *
  */
 class UDPSendingTask extends AsyncTask<Object, Void, Void> {
-    String LOG_TAG = "UDPSendingTask";
+    String LOG_TAG = SDNCommonUtil.LOG_TAG;
 
     @Override
     protected Void doInBackground(Object... params) {

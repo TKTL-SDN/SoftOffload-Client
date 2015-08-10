@@ -38,6 +38,9 @@ import android.util.Log;
  */
 public class SDNCommonUtil {
 
+    public static String LOG_TAG = "eitsdncontroller";
+    
+    
     /**
      * Returns the 32bit dotted format of the provided long ip.
      *

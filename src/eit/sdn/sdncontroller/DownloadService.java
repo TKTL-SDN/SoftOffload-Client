@@ -67,7 +67,7 @@ public class DownloadService extends IntentService {
     private String PREF_DOWNLOADING_URL_KEY = "pref_downloading_url";
     private String DOWNLOADING_URL = "http://www.cs.helsinki.fi/group/eit-sdn/testing/tiny.tmp";
     
-    private String LOG_TAG = "DownloadService";
+    private String LOG_TAG = SDNCommonUtil.LOG_TAG;
     private int MAX_BUFF = 10240;
     public static final int PROGRESS_CODE = 8344;
     private long DELAY_TIME_MS = 2000;
