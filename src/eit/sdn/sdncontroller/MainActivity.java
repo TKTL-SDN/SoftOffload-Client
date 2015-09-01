@@ -367,12 +367,12 @@ public class MainActivity extends Activity {
         } else {
             if (downloadIntent != null) {
                 stopService(downloadIntent);
+                unregisterReceiver(connChangeReceiver);
                 downloadIntent = null;
             }
             isSDNDownloadStarted = false;
             Button downloadButton = (Button)findViewById(R.id.button_download);
             downloadButton.setText("start");
-            unregisterReceiver(connChangeReceiver);
             
             Log.d(LOG_TAG, "cancel downloading file");
         }
